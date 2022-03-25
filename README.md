@@ -1,17 +1,22 @@
 # imapnotes
 
-imapnotes is a Python / Tkinter application to read and write notes stored on an IMAPS server. It expects that your notes reside in the folder _Notes_ in your mailbox
+stickyimapnotes is a Python / PySide2 application to read and write notes stored on an IMAPS server. It expects that your notes reside in the folder _Notes_ in your mailbox.
+It looks like the Notes App from Microsoft, but can sync notes with the IOS note app
 
 It is still being developed.
 
-![ScreenShot](https://ogris.de/imapnotes/imapnotes.png)
 
 
 # Requirements
 
 * Python 3.9
-* tkinter (on Gentoo Linux, emerge python with USE="tk")
-* Pillow: https://python-pillow.org/
+* PySide2
+* html2text
+* sqlalchemy
+* PIL
+* io
+* uuid
+* datetime
 
 
 # Configuration
@@ -27,6 +32,3 @@ pass = _your password_
 ```
 
 
-# Homepage
-
-https://ogris.de/imapnotes/
