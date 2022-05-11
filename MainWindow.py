@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'mainwindow_greenhslsVf.ui'
+## Form generated from reading UI file 'mainwindow_greenRFFvmK.ui'
 ##
 ## Created by: Qt User Interface Compiler version 5.15.1
 ##
@@ -168,7 +168,7 @@ class Ui_MainWindow(object):
         self.footerLayout.setContentsMargins(11, 11, 11, 11)
         self.footerLayout.setObjectName(u"footerLayout")
         self.footerLayout.setSizeConstraint(QLayout.SetNoConstraint)
-        self.footerLayout.setContentsMargins(0, 0, 0, 0)
+        self.footerLayout.setContentsMargins(10, 0, 0, 0)
         self.boldButton = QPushButton(self.footer)
         self.boldButton.setObjectName(u"boldButton")
         self.boldButton.setMinimumSize(QSize(23, 23))
@@ -178,6 +178,12 @@ class Ui_MainWindow(object):
         font5.setBold(True)
         font5.setWeight(75)
         self.boldButton.setFont(font5)
+        self.boldButton.setStyleSheet(u"QPushButton::checked{	background-color: rgba(195, 195, 195, 150);\n"
+"border-top-left-radius:1px;\n"
+"border-top-right-radius:1px;\n"
+"border-bottom-left-radius:1px\n"
+";border-bottom-right-radius:1px;\n"
+"}")
         self.boldButton.setText(u"B")
         self.boldButton.setCheckable(True)
         self.boldButton.setFlat(False)
@@ -194,6 +200,12 @@ class Ui_MainWindow(object):
         font6.setItalic(True)
         font6.setWeight(50)
         self.italicButton.setFont(font6)
+        self.italicButton.setStyleSheet(u"QPushButton::checked{	background-color: rgba(195, 195, 195, 150);\n"
+"border-top-left-radius:1px;\n"
+"border-top-right-radius:1px;\n"
+"border-bottom-left-radius:1px\n"
+";border-bottom-right-radius:1px;\n"
+"}")
         self.italicButton.setText(u"I")
         self.italicButton.setCheckable(True)
 
@@ -209,6 +221,12 @@ class Ui_MainWindow(object):
         font7.setUnderline(True)
         font7.setWeight(50)
         self.underlineButton.setFont(font7)
+        self.underlineButton.setStyleSheet(u"QPushButton::checked{	background-color: rgba(195, 195, 195, 150);\n"
+"border-top-left-radius:1px;\n"
+"border-top-right-radius:1px;\n"
+"border-bottom-left-radius:1px\n"
+";border-bottom-right-radius:1px;\n"
+"}")
         self.underlineButton.setText(u"U")
         self.underlineButton.setCheckable(True)
 
@@ -224,6 +242,12 @@ class Ui_MainWindow(object):
         font8.setWeight(50)
         font8.setStrikeOut(True)
         self.strikeoutButton.setFont(font8)
+        self.strikeoutButton.setStyleSheet(u"QPushButton::checked{	background-color: rgba(195, 195, 195, 150);\n"
+"border-top-left-radius:1px;\n"
+"border-top-right-radius:1px;\n"
+"border-bottom-left-radius:1px\n"
+";border-bottom-right-radius:1px;\n"
+"}")
         self.strikeoutButton.setText(u"S")
         self.strikeoutButton.setCheckable(True)
         self.strikeoutButton.setChecked(False)
@@ -233,6 +257,7 @@ class Ui_MainWindow(object):
         self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
 
         self.footerLayout.addItem(self.horizontalSpacer_2)
+
 
 #---------------------------------------------------------------------------
         self.sizegrip = QSizeGrip(MainWindow)

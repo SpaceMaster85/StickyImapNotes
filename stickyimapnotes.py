@@ -86,7 +86,10 @@ class ImapNotes():
             config.read(os.path.join(os.getcwd(),"imapnotes.ini"))
 
             host = config.get("connection", "host")
-            socket.setdefaulttimeout(1)
+            if self.firstConnect:
+                socket.setdefaulttimeout(10)
+            else:
+                socket.setdefaulttimeout(2)
             if config.has_option("connection", "port"):
                 self.imap = imaplib.IMAP4_SSL(host, config.get("connection", "port"))
             else:
@@ -365,13 +368,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             border-bottom-right-radius:{0}px;
             """.format(radius)
         )
+        #self.footer.setStyleSheet(u"QPushButton::checked{	background-color: rgba(195, 195, 195, 150);}")
         self.textEdit.setStyleSheet('color: rgb(80, 80, 80); background-color: #fff7d1; border-top-left-radius:0px;border-top-right-radius:0px;border-bottom-left-radius:0px;border-bottom-right-radius:0px;')
         self.textEdit.setFont(QFont('Calibri', 14))
        
         self.sizegrip.setStyleSheet('background-color: rgba(169, 255, 203, 0);')
-
-      
-
+        
         self.textEdit.selectionChanged.connect(self.update_format)
         self.boldButton.toggled.connect(lambda x: self.textEdit.setFontWeight(QFont.Bold if x else QFont.Normal))
         self.italicButton.toggled.connect(self.textEdit.setFontItalic)
