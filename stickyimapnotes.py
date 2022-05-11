@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 
 
-import os, sys, configparser, imaplib, re,  PIL.Image, PIL.ImageTk
+import os, sys, configparser, imaplib, re,  PIL.Image, PIL.ImageTk, socket
 import email.parser, email.header, email.utils, email.message
 from PIL import Image
 import base64
@@ -33,19 +33,19 @@ class Note(Base):
     id = Column(Integer, primary_key=True)
     uid = Column(Integer, unique=True)
     xuuid= Column(String(1000), nullable=True)
-    timestamp = Column(DateTime(timezone = True), nullable=False) 
-    subject = Column(String(1000), nullable=False)    
+    timestamp = Column(DateTime(timezone = True), nullable=False)
+    subject = Column(String(1000), nullable=False)
     type = Column(String(1000), nullable=False)
     deleteNote = Column(Boolean, unique=False, default=False)
     newNote = Column(Boolean, unique=False, default=False)
-    sync = Column(Boolean, unique=False, default=False)   
+    sync = Column(Boolean, unique=False, default=False)
     text = Column(String(1000), nullable=True)
     x = Column(Integer, nullable=False, default=0)
     y = Column(Integer, nullable=False, default=0)
     w = Column(Integer, nullable=False, default=0)
     h = Column(Integer, nullable=False, default=0)
 
-engine = create_engine('sqlite:///notes.db')
+engine = create_engine('sqlite:///notes.db', connect_args={'check_same_thread': False})
 # Initalize the database if it is not already.
 #if not engine.dialect.has_table(engine, "note"):
 Base.metadata.create_all(engine)
@@ -63,7 +63,8 @@ def create_new_note():
 
 
 class ImapNotes():
-    def __init__(self):
+    def __init__(self, parent = None):
+        #QThread.__init__(self, parent)
         self.imap = []
         self.notes = []
         self.data = []
@@ -71,6 +72,12 @@ class ImapNotes():
         self.timer.timeout.connect(self.getNotes)
         self.user =""
         self.startup=True
+        self.firstConnect = True
+        #self.exiting= False
+        self.getNotes()
+
+
+
 
     def open(self):
         try:
@@ -79,6 +86,7 @@ class ImapNotes():
             config.read(os.path.join(os.getcwd(),"imapnotes.ini"))
 
             host = config.get("connection", "host")
+            socket.setdefaulttimeout(1)
             if config.has_option("connection", "port"):
                 self.imap = imaplib.IMAP4_SSL(host, config.get("connection", "port"))
             else:
@@ -91,23 +99,35 @@ class ImapNotes():
             for obj in session.query(Note).all():
                 obj.sync=False
                 session.add(obj)
-            session.commit() 
+            session.commit()
 
         except Exception as e:
-            QMessageBox.critical("Connection failed",
-                "Cannot connect to IMAPS server:\n%s" % (str(e),))
-            sys.exit(1)
+            if self.firstConnect:
+                QMessageBox.critical(None, "Connection failed","Cannot connect to IMAPS server:\n%s" % (str(e)))
+                self.firstConnect = False
+            #sys.exit(1)
+            
 
     def getNotes(self):
-        
+
         try:
             self.imap.noop()
         except Exception as e:
-            self.imap.open()
+            try:
+                self.imap.open()
+            except Exception as e:
+                self.open()
+                self.timer.start(5000)
+                return
         # search returns tuple with list
         notes_numbers = self.imap.uid("search", None, "ALL")[1][0].decode().replace(" ", ",")
         # imap fetch expects comma separated list
         newWindow = False
+        for obj in session.query(Note).all():
+            obj.sync=False
+            session.add(obj)
+        #session.commit()
+
 
         if len(notes_numbers) > 0:
             notes_list = self.imap.uid("fetch", notes_numbers, "RFC822")
@@ -134,7 +154,7 @@ class ImapNotes():
                     if not charset is None:
                         substring = substring.decode(charset)
                     subject += substring
-                
+
                 text, type=self.decodeNote(message)
                 #print(text)
                 print("Found on server: ", subject)
@@ -150,7 +170,7 @@ class ImapNotes():
                     session.add(obj)
                     session.commit()
                     continue
-                
+
                 obj=session.query(Note).filter(Note.xuuid==xuuid, Note.timestamp<timestamp).first()
                 if obj:
                     print("Update database: ", subject)
@@ -165,20 +185,20 @@ class ImapNotes():
                     session.add(obj)
                     session.commit()
                     continue
-                
+
                 obj=session.query(Note).filter(Note.xuuid==xuuid, Note.timestamp>timestamp).first()
                 if obj:
                     print("Update imap: ", subject)
                     obj.sync= True
-                    self.updateNotes(obj)  
+                    self.updateNotes(obj)
                     session.add(obj)
                     session.commit()
                     continue
 
                 obj=session.query(Note).filter_by(xuuid=xuuid).first()
-                if obj == None:       
+                if obj == None:
                     print("New Note on Server: ", subject)
-                    obj = Note() 
+                    obj = Note()
                     obj.uid = uid
                     obj.x = 12
                     obj.y = 12
@@ -188,7 +208,7 @@ class ImapNotes():
 
                     obj.subject = subject
                     obj.timestamp = timestamp
-                    
+
                     obj.text= text
                     obj.type = type
                     obj.sync= True
@@ -200,7 +220,7 @@ class ImapNotes():
                     if newWindow and not self.startup:
                         MainWindow(obj=obj)
                     session.add(obj)
-                    session.commit()    
+                    session.commit()
 
         for obj in session.query(Note).filter_by(deleteNote=True).all():
             print("Delete Note Imap")
@@ -214,15 +234,18 @@ class ImapNotes():
             obj.sync = True
         for obj in session.query(Note).filter_by(sync=False).all():
             print("Delete Note")
-            session.delete(obj)        
+            if self.startup==False:
+                print("Close Note")
+                _ACTIVE_NOTES[obj.xuuid].close()
+            session.delete(obj)
 
-        session.commit()    
+        session.commit()
         self.startup = False
         self.timer.start(30000)
 
 
     def updateNotes(self, obj):
-   
+
         now = time.strftime('%a, %d %b %Y %H:%M:%S %z')
         message = email.message.EmailMessage()
         rfc_now = email.utils.formatdate(localtime=True)
@@ -260,7 +283,7 @@ class ImapNotes():
                     #print(part)
                     self.decodeNote(part)
             else:
-                
+
                 contenttype = message.get_content_type().lower()
                 #print(contenttype)
                 body = message.get_payload(decode=True)
@@ -270,7 +293,7 @@ class ImapNotes():
                     return body.decode().replace("\r", ""), "text/plain"
                 elif contenttype.startswith("text/html"):
                     #self.textEdit.setHtml(body.decode())
-                    
+
                     #print(body.decode())
                     return body.decode(), "text/html"
                 # elif contenttype.startswith("image/"):
@@ -283,7 +306,7 @@ class ImapNotes():
                 #     im_bytes = im_file.getvalue()  # im_bytes: image in binary format.
                 #     im_b64 = base64.b64encode(im_bytes)
                 #     print(im_b64)
-                #     return 
+                #     return
                 else:
                     return ( "<cannot display " + contenttype + ">") ,"Unkown"
 
@@ -303,8 +326,64 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sizegrip.installEventFilter(self)
         self.header.installEventFilter(self)
 
+
+
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        #self.setWindowOpacity(0.6)
+
+
+        radius = 10
+        self.centralWidget.setStyleSheet(
+            """
+            border-top-left-radius:{0}px;
+            border-bottom-left-radius:{0}px;
+            border-top-right-radius:{0}px;
+            border-bottom-right-radius:{0}px;
+            """.format(radius)
+        )
+        # Custom green palette.
+        # self.header.setStyleSheet('background-color: rgb(152, 230, 182);')
+        # self.textEdit.setStyleSheet('color: rgb(80, 80, 80); background-color: rgb(169, 255, 203);')
+        # self.footer.setStyleSheet('background-color: rgb(169, 255, 203);')
+
+        #Windows Style
+        self.header.setStyleSheet(
+            """
+            background-color: #fff2ab;
+            border-top-left-radius:{0}px;
+            border-bottom-left-radius:0px;
+            border-top-right-radius:{0}px;
+            border-bottom-right-radius:0px;
+            """.format(radius)
+        )
+        self.footer.setStyleSheet(
+            """
+            background-color: #fff7d1;             
+            border-top-left-radius:0px;
+            border-bottom-left-radius:{0}px;
+            border-top-right-radius:0px;
+            border-bottom-right-radius:{0}px;
+            """.format(radius)
+        )
+        self.textEdit.setStyleSheet('color: rgb(80, 80, 80); background-color: #fff7d1; border-top-left-radius:0px;border-top-right-radius:0px;border-bottom-left-radius:0px;border-bottom-right-radius:0px;')
+        self.textEdit.setFont(QFont('Calibri', 14))
+       
+        self.sizegrip.setStyleSheet('background-color: rgba(169, 255, 203, 0);')
+
+      
+
         self.textEdit.selectionChanged.connect(self.update_format)
         self.boldButton.toggled.connect(lambda x: self.textEdit.setFontWeight(QFont.Bold if x else QFont.Normal))
+        self.italicButton.toggled.connect(self.textEdit.setFontItalic)
+        self.underlineButton.toggled.connect(self.textEdit.setFontUnderline)
+
+        def strikeOutFont(state):
+            item = self.textEdit.currentFont()
+            item.setStrikeOut(state)
+            self.textEdit.setCurrentFont(item)
+
+        self.strikeoutButton.toggled.connect(strikeOutFont)
+
         # Load/save note data, store this notes db reference.
         if obj:
             self.obj = obj
@@ -329,6 +408,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._drag_active = False
         self._format_actions = [
             self.boldButton,
+            self.italicButton,
+            self.underlineButton,
+            self.strikeoutButton,
             # We don't need to disable signals for alignment, as they are paragraph-wide.
         ]
 
@@ -351,11 +433,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if event.type() == QEvent.MouseButtonRelease:
                 if self._drag_active:
                     self.savePosition()
-                    self._drag_active = False    
+                    self._drag_active = False
         if source == self.sizegrip:
             # print("Resize")
             # if event.type() == QEvent.MouseButtonPress:
-            #     print('mouse pressed', source)  
+            #     print('mouse pressed', source)
             # if event.type() == QEvent.MouseMove:
             #     print('mouse moved', source)
             if event.type() == QEvent.MouseButtonRelease:
@@ -407,7 +489,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         _ACTIVE_NOTES[self.obj.xuuid] = self
 
-    
+
     def deleteNote(self):
         result = QMessageBox.question(self, "Delete Note?", "Are you sure you want to delete this note?")
         if result == QMessageBox.Yes:
@@ -429,10 +511,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # # Nasty, but we get the font-size as a float but want it was an int
         # self.fontsize.setCurrentText(str(int(self.editor.fontPointSize())))
 
-        # self.italic_action.setChecked(self.editor.fontItalic())
-        # self.underline_action.setChecked(self.editor.fontUnderline())
+        self.italicButton.setChecked(self.textEdit.fontItalic())
+        self.underlineButton.setChecked(self.textEdit.fontUnderline())
         self.boldButton.setChecked(self.textEdit.fontWeight() == QFont.Bold)
-
+        self.strikeoutButton.setChecked(self.textEdit.font().strikeOut())
         # self.alignl_action.setChecked(self.editor.alignment() == Qt.AlignLeft)
         # self.alignc_action.setChecked(self.editor.alignment() == Qt.AlignCenter)
         # self.alignr_action.setChecked(self.editor.alignment() == Qt.AlignRight)
@@ -451,20 +533,26 @@ if __name__ == '__main__':
     app = QApplication([])
     app.setApplicationName("Sticky Notes")
     app.setStyle("Fusion")
+    
     # Custom brown palette.
     # palette = QPalette()
     # palette.setColor(QPalette.Window, QColor(233, 209, 97)) #233
     # palette.setColor(QPalette.WindowText, QColor(78, 78, 76))
     # palette.setColor(QPalette.ButtonText, QColor(78, 78, 76))
     # palette.setColor(QPalette.Text, QColor(78, 78, 76))
-    # palette.setColor(QPalette.Base, QColor(233, 209, 97))
-    # palette.setColor(QPalette.AlternateBase, QColor(233, 209, 97))
+    # palette.setColor(QPalette.Base, QColor(233, 209, 150))
+    # palette.setColor(QPalette.AlternateBase, QColor(233, 209, 150))
     # app.setPalette(palette)
-    
-    imap = ImapNotes()
-    imap.open()
-    imap.getNotes()
-    
+
+
+
+    # thread = ImapNotes()
+    # thread.start()
+
+    notes = ImapNotes()
+    #notes.open()
+    #notes.getNotes()
+
     existing_notes = session.query(Note).all()
     if len(existing_notes) == 0:
         MainWindow()
@@ -472,4 +560,5 @@ if __name__ == '__main__':
         for note in existing_notes:
             MainWindow(obj=note)
     app.exec_()
-    imap.close()
+    #thread.exiting=True
+    notes.close()
